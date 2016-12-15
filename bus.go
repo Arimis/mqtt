@@ -4,6 +4,8 @@ import (
 	"errors"
 	"log"
 
+	"crypto/tls"
+
 	"github.com/casaplatform/casa"
 	"github.com/gomqtt/broker"
 	"github.com/gomqtt/transport"
@@ -21,6 +23,10 @@ type Bus struct {
 	logger     broker.Logger
 	engine     *broker.Engine
 
+	tls          bool
+	certificates []tls.Certificate
+
+	launcher   transport.Launcher
 	clientsURL string
 }
 
@@ -50,29 +56,49 @@ func New(options ...BusOption) (casa.MessageBus, error) {
 	if bus.engine == nil {
 		bus.engine = broker.NewEngineWithBackend(DefaultBackend)
 	}
+
 	bus.engine.Logger = bus.logger
 	if len(bus.transportList) < 1 {
 		return nil, ErrNoURL
 	}
 
+	bus.launcher = transport.Launcher{
+		TLSConfig: &tls.Config{},
+	}
+
+	if bus.tls {
+		bus.launcher.TLSConfig.Certificates = bus.certificates
+	}
+
 	for _, url := range bus.transportList {
-		server, err := transport.Launch(url)
+		server, err := bus.launcher.Launch(url)
 		if err != nil {
 			return nil, err
 		}
+
+		log.Println("Listening on:", url)
 		bus.engine.Accept(server)
 		bus.transports = append(bus.transports, server)
 	}
 
 	return bus, nil
 }
-
-func ListenOn(url string) BusOption {
+func TLS(cert tls.Certificate) BusOption {
+	return func(b *Bus) error {
+		b.tls = true
+		b.certificates = append(b.certificates, cert)
+		return nil
+	}
+}
+func ListenOn(urls ...string) BusOption {
 	return func(b *Bus) error {
 		if b.transportList == nil {
 			b.transportList = make([]string, 1)
 		}
-		b.transportList = append(b.transportList, url)
+
+		for _, url := range urls {
+			b.transportList = append(b.transportList, url)
+		}
 
 		return nil
 	}
