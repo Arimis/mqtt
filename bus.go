@@ -22,6 +22,7 @@ type Bus struct {
 	backend    broker.Backend
 	logger     broker.Logger
 	engine     *broker.Engine
+	users      map[string]string
 
 	tls          bool
 	certificates []tls.Certificate
@@ -53,9 +54,13 @@ func New(options ...BusOption) (casa.MessageBus, error) {
 		option(bus)
 	}
 
-	if bus.engine == nil {
-		bus.engine = broker.NewEngineWithBackend(DefaultBackend)
+	backend := broker.NewMemoryBackend()
+
+	if len(bus.users) > 0 {
+		backend.Logins = bus.users
 	}
+
+	bus.engine = broker.NewEngineWithBackend(backend)
 
 	bus.engine.Logger = bus.logger
 	if len(bus.transportList) < 1 {
@@ -83,6 +88,14 @@ func New(options ...BusOption) (casa.MessageBus, error) {
 
 	return bus, nil
 }
+
+func Users(users map[string]string) BusOption {
+	return func(b *Bus) error {
+		b.users = users
+		return nil
+	}
+}
+
 func TLS(cert tls.Certificate) BusOption {
 	return func(b *Bus) error {
 		b.tls = true
@@ -100,13 +113,6 @@ func ListenOn(urls ...string) BusOption {
 			b.transportList = append(b.transportList, url)
 		}
 
-		return nil
-	}
-}
-
-func Backend(backend broker.Backend) BusOption {
-	return func(b *Bus) error {
-		b.engine = broker.NewEngineWithBackend(backend)
 		return nil
 	}
 }
