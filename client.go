@@ -15,7 +15,7 @@ type Client struct {
 
 	client *client.Client
 
-	options  *client.Options
+	options  *client.Config
 	session  client.Session
 	callback client.Callback
 	logger   client.Logger
@@ -25,7 +25,7 @@ type Client struct {
 
 func NewClient(url string, options ...ClientOption) (*Client, error) {
 	newClient := &Client{
-		options: client.NewOptions(url),
+		options: client.NewConfig(url),
 		timeout: 1 * time.Second,
 	}
 
